@@ -77,9 +77,8 @@ class MX_WFAS(Dataset):
         
         if self.transform is not None:
             sample = self.transform(sample)
-        sample = np.transpose(sample, (2, 0, 1)).astype(np.float32)
 
-        return (torch.tensor(sample), torch.tensor(labels, dtype=torch.long))
+        return sample, labels
 
     def __len__(self):
         return len(self.imgidx)

@@ -133,10 +133,7 @@ def get_wfas(args):
     transform_labeled = transforms.Compose([
         transforms.ToPILImage(),
         transforms.RandomHorizontalFlip(),
-        transforms.RandomCrop(size=args.resize,
-                              padding=int(args.resize * 0.125),
-                              fill=128,
-                              padding_mode='constant'),
+        transforms.Resize([args.resize,args.resize]),
         transforms.ToTensor(),
         transforms.Normalize(mean=wfas_mean, std=wfas_std),
     ])

@@ -533,13 +533,13 @@ def main():
     if args.local_rank not in [-1, 0]:
         torch.distributed.barrier()
 
-    teacher_model = timm.create_model("mobilenetv3_large_100", pretrained=True, num_classes=args.num_classes, drop_rate=args.teacher_dropout)
-    student_model = timm.create_model("mobilenetv3_large_100", pretrained=True, num_classes=args.num_classes, drop_rate=args.teacher_dropout)
+    teacher_model = timm.create_model("mobilenetv3_small_100", pretrained=True, num_classes=args.num_classes, drop_rate=args.teacher_dropout)
+    student_model = timm.create_model("mobilenetv3_small_100", pretrained=True, num_classes=args.num_classes, drop_rate=args.teacher_dropout)
 
     if args.local_rank == 0:
         torch.distributed.barrier()
 
-    logger.info(f"Model: mobilenetv3_large_100")
+    logger.info(f"Model: mobilenetv3_small_100")
     logger.info(f"Params: {sum(p.numel() for p in teacher_model.parameters())/1e6:.2f}M")
 
     teacher_model.to(args.device)
