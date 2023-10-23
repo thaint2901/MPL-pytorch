@@ -131,6 +131,7 @@ def get_wfas(args):
     # else:
     #     n, m = 2, 10  # default
     transform_labeled = transforms.Compose([
+        transforms.ToPILImage(),
         transforms.RandomHorizontalFlip(),
         transforms.RandomCrop(size=args.resize,
                               padding=int(args.resize * 0.125),

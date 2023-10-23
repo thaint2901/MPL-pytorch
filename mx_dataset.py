@@ -4,6 +4,7 @@ import numbers
 import torch
 from torch.utils.data import Dataset
 from torchvision import transforms
+import cv2
 
 
 def _get_new_box(src_w, src_h, bbox, scale):
@@ -75,10 +76,47 @@ class MX_WFAS(Dataset):
         sample = sample[bbox[1]:bbox[3], bbox[0]:bbox[2]].copy()
         
         if self.transform is not None:
-            sample = self.transform(label=label, img=sample)['image']
+            sample = self.transform(sample)
         sample = np.transpose(sample, (2, 0, 1)).astype(np.float32)
 
         return (torch.tensor(sample), torch.tensor(labels, dtype=torch.long))
 
     def __len__(self):
         return len(self.imgidx)
+
+
+if __name__ == "__main__":
+    from torchvision import transforms
+    from torchtoolbox.transform import Cutout
+    def get_transform(input_size=224, is_val=False):
+        if is_val:
+            return transforms.Compose([
+                transforms.ToPILImage(),
+                transforms.Resize([input_size,input_size]),
+                transforms.ToTensor(),
+                transforms.Normalize(
+                    [0.485, 0.456, 0.406],
+                    [0.229, 0.2254, 0.225])
+            ])
+
+        return transforms.Compose([
+            transforms.ToPILImage(),
+            transforms.RandomHorizontalFlip(),
+            transforms.RandomCrop(size=224,
+                                padding=int(224 * 0.125),
+                                fill=128,
+                                padding_mode='constant'),
+            transforms.ToTensor(),
+            transforms.Normalize(
+                [0.485, 0.456, 0.406],
+                [0.229, 0.2254, 0.225])
+        ])
+    
+    train_set = MX_WFAS(
+        path_imgrec="/mnt/nvme0n1p2/datasets/untispoofing/CVPR2023-Anti_Spoof-Challenge-Release-Data-20230209/test_4.0.rec",
+        path_imgidx="/mnt/nvme0n1p2/datasets/untispoofing/CVPR2023-Anti_Spoof-Challenge-Release-Data-20230209/test_4.0.idx",
+        transform=get_transform(input_size=224)
+    )
+
+    print(train_set[0])
+    print("Done")
