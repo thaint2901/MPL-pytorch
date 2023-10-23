@@ -5,6 +5,7 @@ import os
 import random
 import time
 
+import timm
 import numpy as np
 import torch
 from torch.cuda import amp
@@ -30,7 +31,7 @@ parser.add_argument('--name', type=str, required=True, help='experiment name')
 parser.add_argument('--data-path', default='./data', type=str, help='data path')
 parser.add_argument('--save-path', default='./checkpoint', type=str, help='save path')
 parser.add_argument('--dataset', default='cifar10', type=str,
-                    choices=['cifar10', 'cifar100'], help='dataset name')
+                    choices=['cifar10', 'cifar100', 'wfas'], help='dataset name')
 parser.add_argument('--num-labeled', type=int, default=4000, help='number of labeled data')
 parser.add_argument("--expand-labels", action="store_true", help="expand labels to fit eval steps")
 parser.add_argument('--total-steps', default=300000, type=int, help='number of total steps to run')
@@ -168,7 +169,11 @@ def train_loop(args, labeled_loader, unlabeled_loader, test_loader, finetune_dat
             unlabeled_iter = iter(unlabeled_loader)
             # error occurs ↓
             # (images_uw, images_us), _ = unlabeled_iter.next()
-            (images_uw, images_us), _ = next(unlabeled_iter)
+            if args.dataset == "wfas":
+                images_us, _ = next(unlabeled_iter)
+                images_uw = images_us
+            else:
+                (images_uw, images_us), _ = next(unlabeled_iter)
 
         data_time.update(time.time() - end)
 
@@ -288,22 +293,22 @@ def train_loop(args, labeled_loader, unlabeled_loader, test_loader, finetune_dat
 #                            "train/6.mask": mean_mask.avg})
 
                 test_model = avg_student_model if avg_student_model is not None else student_model
-                test_loss, top1, top5 = evaluate(args, test_loader, test_model, criterion)
+                # test_loss, top1, top5 = evaluate(args, test_loader, test_model, criterion)
 
-                args.writer.add_scalar("test/loss", test_loss, args.num_eval)
-                args.writer.add_scalar("test/acc@1", top1, args.num_eval)
-                args.writer.add_scalar("test/acc@5", top5, args.num_eval)
+                # args.writer.add_scalar("test/loss", test_loss, args.num_eval)
+                # args.writer.add_scalar("test/acc@1", top1, args.num_eval)
+                # args.writer.add_scalar("test/acc@5", top5, args.num_eval)
 #                 wandb.log({"test/loss": test_loss,
 #                            "test/acc@1": top1,
 #                            "test/acc@5": top5})
 
-                is_best = top1 > args.best_top1
-                if is_best:
-                    args.best_top1 = top1
-                    args.best_top5 = top5
+                # is_best = top1 > args.best_top1
+                # if is_best:
+                #     args.best_top1 = top1
+                #     args.best_top5 = top5
 
-                logger.info(f"top-1 acc: {top1:.2f}")
-                logger.info(f"Best top-1 acc: {args.best_top1:.2f}")
+                # logger.info(f"top-1 acc: {top1:.2f}")
+                # logger.info(f"Best top-1 acc: {args.best_top1:.2f}")
 
                 save_checkpoint(args, {
                     'step': step + 1,
@@ -318,7 +323,7 @@ def train_loop(args, labeled_loader, unlabeled_loader, test_loader, finetune_dat
                     'student_scheduler': s_scheduler.state_dict(),
                     'teacher_scaler': t_scaler.state_dict(),
                     'student_scaler': s_scaler.state_dict(),
-                }, is_best)
+                }, True)
 
     if args.local_rank in [-1, 0]:
         args.writer.add_scalar("result/test_acc@1", args.best_top1)
@@ -425,22 +430,22 @@ def finetune(args, finetune_dataset, test_loader, model, criterion):
         labeled_iter.close()
         if args.local_rank in [-1, 0]:
             args.writer.add_scalar("finetune/train_loss", losses.avg, epoch)
-            test_loss, top1, top5 = evaluate(args, test_loader, model, criterion)
-            args.writer.add_scalar("finetune/test_loss", test_loss, epoch)
-            args.writer.add_scalar("finetune/acc@1", top1, epoch)
-            args.writer.add_scalar("finetune/acc@5", top5, epoch)
+            # test_loss, top1, top5 = evaluate(args, test_loader, model, criterion)
+            # args.writer.add_scalar("finetune/test_loss", test_loss, epoch)
+            # args.writer.add_scalar("finetune/acc@1", top1, epoch)
+            # args.writer.add_scalar("finetune/acc@5", top5, epoch)
 #             wandb.log({"finetune/train_loss": losses.avg,
 #                        "finetune/test_loss": test_loss,
 #                        "finetune/acc@1": top1,
 #                        "finetune/acc@5": top5})
 
-            is_best = top1 > args.best_top1
-            if is_best:
-                args.best_top1 = top1
-                args.best_top5 = top5
+            # is_best = top1 > args.best_top1
+            # if is_best:
+            #     args.best_top1 = top1
+            #     args.best_top5 = top5
 
-            logger.info(f"top-1 acc: {top1:.2f}")
-            logger.info(f"Best top-1 acc: {args.best_top1:.2f}")
+            # logger.info(f"top-1 acc: {top1:.2f}")
+            # logger.info(f"Best top-1 acc: {args.best_top1:.2f}")
 
             save_checkpoint(args, {
                 'step': step + 1,
@@ -449,7 +454,7 @@ def finetune(args, finetune_dataset, test_loader, model, criterion):
                 'student_state_dict': model.state_dict(),
                 'avg_state_dict': None,
                 'student_optimizer': optimizer.state_dict(),
-            }, is_best, finetune=True)
+            }, True, finetune=True)
         if args.local_rank in [-1, 0]:
             args.writer.add_scalar("result/finetune_acc@1", args.best_top1)
 #             wandb.log({"result/finetune_acc@1": args.best_top1})
@@ -514,34 +519,27 @@ def main():
         num_workers=args.workers,
         drop_last=True)
 
-    test_loader = DataLoader(test_dataset,
-                             sampler=SequentialSampler(test_dataset),
-                             batch_size=args.batch_size,
-                             num_workers=args.workers)
+    # test_loader = DataLoader(test_dataset,
+    #                          sampler=SequentialSampler(test_dataset),
+    #                          batch_size=args.batch_size,
+    #                          num_workers=args.workers)
+    test_loader = None
 
-    if args.dataset == "cifar10":
-        depth, widen_factor = 28, 2
-    elif args.dataset == 'cifar100':
-        depth, widen_factor = 28, 8
+    # if args.dataset == "cifar10":
+    #     depth, widen_factor = 28, 2
+    # elif args.dataset == 'cifar100':
+    #     depth, widen_factor = 28, 8
 
     if args.local_rank not in [-1, 0]:
         torch.distributed.barrier()
 
-    teacher_model = WideResNet(num_classes=args.num_classes,
-                               depth=depth,
-                               widen_factor=widen_factor,
-                               dropout=0,
-                               dense_dropout=args.teacher_dropout)
-    student_model = WideResNet(num_classes=args.num_classes,
-                               depth=depth,
-                               widen_factor=widen_factor,
-                               dropout=0,
-                               dense_dropout=args.student_dropout)
+    teacher_model = timm.create_model("mobilenetv3_large_100", pretrained=True, num_classes=args.num_classes, drop_rate=args.teacher_dropout)
+    student_model = timm.create_model("mobilenetv3_large_100", pretrained=True, num_classes=args.num_classes, drop_rate=args.teacher_dropout)
 
     if args.local_rank == 0:
         torch.distributed.barrier()
 
-    logger.info(f"Model: WideResNet {depth}x{widen_factor}")
+    logger.info(f"Model: mobilenetv3_large_100")
     logger.info(f"Params: {sum(p.numel() for p in teacher_model.parameters())/1e6:.2f}M")
 
     teacher_model.to(args.device)
@@ -625,16 +623,18 @@ def main():
             output_device=args.local_rank, find_unused_parameters=True)
 
     if args.finetune:
-        del t_scaler, t_scheduler, t_optimizer, teacher_model, unlabeled_loader
-        del s_scaler, s_scheduler, s_optimizer
-        finetune(args, finetune_dataset, test_loader, student_model, criterion)
-        return
+        raise NotImplementedError
+        # del t_scaler, t_scheduler, t_optimizer, teacher_model, unlabeled_loader
+        # del s_scaler, s_scheduler, s_optimizer
+        # finetune(args, finetune_dataset, test_loader, student_model, criterion)
+        # return
 
     if args.evaluate:
-        del t_scaler, t_scheduler, t_optimizer, teacher_model, unlabeled_loader, labeled_loader
-        del s_scaler, s_scheduler, s_optimizer
-        evaluate(args, test_loader, student_model, criterion)
-        return
+        raise NotImplementedError
+        # del t_scaler, t_scheduler, t_optimizer, teacher_model, unlabeled_loader, labeled_loader
+        # del s_scaler, s_scheduler, s_optimizer
+        # evaluate(args, test_loader, student_model, criterion)
+        # return
 
     teacher_model.zero_grad()
     student_model.zero_grad()

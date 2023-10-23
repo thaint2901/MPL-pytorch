@@ -1,5 +1,6 @@
 import logging
 import math
+import os
 
 import numpy as np
 from PIL import Image
@@ -8,11 +9,14 @@ from torchvision import transforms
 from torchvision.transforms import InterpolationMode
 
 from augmentation import RandAugmentCIFAR
+from mx_dataset import MX_WFAS
 
 logger = logging.getLogger(__name__)
 
 cifar10_mean = (0.491400, 0.482158, 0.4465231)
 cifar10_std = (0.247032, 0.243485, 0.2615877)
+wfas_mean = (0.5295, 0.4319, 0.3978)
+wfas_std = (0.2578, 0.2299, 0.2246)
 cifar100_mean = (0.507075, 0.486549, 0.440918)
 cifar100_std = (0.267334, 0.256438, 0.276151)
 normal_mean = (0.5, 0.5, 0.5)
@@ -119,6 +123,38 @@ def get_cifar100(args):
                                      transform=transform_val, download=False)
 
     return train_labeled_dataset, train_unlabeled_dataset, test_dataset, finetune_dataset
+
+
+def get_wfas(args):
+    # if args.randaug:
+    #     n, m = args.randaug
+    # else:
+    #     n, m = 2, 10  # default
+    transform_labeled = transforms.Compose([
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomCrop(size=args.resize,
+                              padding=int(args.resize * 0.125),
+                              fill=128,
+                              padding_mode='constant'),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=wfas_mean, std=wfas_std),
+    ])
+
+    train_labeled_dataset = MX_WFAS(
+        path_imgidx=os.path.join(args.data_path, "train_4.0.idx"),
+        path_imgrec=os.path.join(args.data_path, "train_4.0.rec"),
+        transform=transform_labeled,
+        scale=1.5
+    )
+    finetune_dataset = train_labeled_dataset
+    train_unlabeled_dataset = MX_WFAS(
+        path_imgidx=os.path.join(args.data_path, "test_4.0.idx"),
+        path_imgrec=os.path.join(args.data_path, "test_4.0.rec"),
+        transform=transform_labeled,
+        scale=1.5
+    )
+
+    return train_labeled_dataset, train_unlabeled_dataset, None, finetune_dataset
 
 
 def x_u_split(args, labels):
@@ -251,4 +287,5 @@ class CIFAR100SSL(datasets.CIFAR100):
 
 
 DATASET_GETTERS = {'cifar10': get_cifar10,
-                   'cifar100': get_cifar100}
+                   'cifar100': get_cifar100,
+                   'wfas': get_wfas}
