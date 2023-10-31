@@ -135,21 +135,21 @@ def get_wfas(args):
         transforms.RandomHorizontalFlip(),
         transforms.Resize([args.resize,args.resize]),
         transforms.ToTensor(),
-        transforms.Normalize(mean=wfas_mean, std=wfas_std),
+        transforms.Normalize(mean=normal_mean, std=normal_std),
     ])
 
     train_labeled_dataset = MX_WFAS(
         path_imgidx=os.path.join(args.data_path, "train_4.0.idx"),
         path_imgrec=os.path.join(args.data_path, "train_4.0.rec"),
         transform=transform_labeled,
-        scale=1.5
+        scale=None
     )
     finetune_dataset = train_labeled_dataset
     train_unlabeled_dataset = MX_WFAS(
         path_imgidx=os.path.join(args.data_path, "test_4.0.idx"),
         path_imgrec=os.path.join(args.data_path, "test_4.0.rec"),
         transform=transform_labeled,
-        scale=1.5
+        scale=None
     )
 
     return train_labeled_dataset, train_unlabeled_dataset, None, finetune_dataset

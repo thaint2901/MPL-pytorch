@@ -533,8 +533,8 @@ def main():
     if args.local_rank not in [-1, 0]:
         torch.distributed.barrier()
 
-    teacher_model = timm.create_model("mobilenetv3_small_100", pretrained=True, num_classes=args.num_classes, drop_rate=args.teacher_dropout)
-    student_model = timm.create_model("mobilenetv3_small_100", pretrained=True, num_classes=args.num_classes, drop_rate=args.teacher_dropout)
+    teacher_model = timm.create_model("mobilenetv3_small_100", pretrained=False, num_classes=args.num_classes, drop_rate=args.teacher_dropout)
+    student_model = timm.create_model("mobilenetv3_small_100", pretrained=False, num_classes=args.num_classes, drop_rate=args.teacher_dropout)
 
     if args.local_rank == 0:
         torch.distributed.barrier()
@@ -590,8 +590,8 @@ def main():
             logger.info(f"=> loading checkpoint '{args.resume}'")
             loc = f'cuda:{args.gpu}'
             checkpoint = torch.load(args.resume, map_location=loc)
-            args.best_top1 = checkpoint['best_top1'].to(torch.device('cpu'))
-            args.best_top5 = checkpoint['best_top5'].to(torch.device('cpu'))
+            # args.best_top1 = checkpoint['best_top1'].to(torch.device('cpu'))
+            # args.best_top5 = checkpoint['best_top5'].to(torch.device('cpu'))
             if not (args.evaluate or args.finetune):
                 args.start_step = checkpoint['step']
                 t_optimizer.load_state_dict(checkpoint['teacher_optimizer'])

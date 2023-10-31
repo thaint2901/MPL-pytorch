@@ -49,7 +49,7 @@ def clamp(x, min_x, max_x):
 
 
 class MX_WFAS(Dataset):
-    def __init__(self, path_imgrec, path_imgidx, transform, scale=1.0, multi_learning=False):
+    def __init__(self, path_imgrec, path_imgidx, transform, scale=None, multi_learning=False):
         super(MX_WFAS, self).__init__()
         self.transform = transform
         self.imgrec = mx.recordio.MXIndexedRecordIO(path_imgidx, path_imgrec, 'r')
@@ -71,8 +71,11 @@ class MX_WFAS(Dataset):
             labels = label
         
         # crop face bbox
-        # scale = np.random.uniform(1.0, 1.2)
-        bbox = _get_new_box(sample.shape[0], sample.shape[1], bbox, scale=self.scale)
+        if self.scale is None:
+            self.scale = np.random.uniform(1.0, 1.2)
+        # cv2.rectangle(sample, (bbox[0], bbox[1]), (bbox[2], bbox[3]), (0, 0, 255), 2)
+        bbox = _get_new_box(sample.shape[1], sample.shape[0], bbox, scale=self.scale)
+        # cv2.rectangle(sample, (bbox[0], bbox[1]), (bbox[2], bbox[3]), (0, 255, 0), 2)
         sample = sample[bbox[1]:bbox[3], bbox[0]:bbox[2]].copy()
         
         if self.transform is not None:
@@ -100,22 +103,29 @@ if __name__ == "__main__":
 
         return transforms.Compose([
             transforms.ToPILImage(),
+            #transforms.RandomErasing(),
+            transforms.Resize([input_size,input_size]),
+            transforms.ColorJitter(0.15, 0.15, 0.15),
+            transforms.RandomCrop(input_size, padding=6),  #从图片中随机裁剪出尺寸为 input_size 的图片，如果有 padding，那么先进行 padding，再随机裁剪 input_size 大小的图片
+            Cutout(0.2),
+
             transforms.RandomHorizontalFlip(),
-            transforms.RandomCrop(size=224,
-                                padding=int(224 * 0.125),
-                                fill=128,
-                                padding_mode='constant'),
-            transforms.ToTensor(),
-            transforms.Normalize(
-                [0.485, 0.456, 0.406],
-                [0.229, 0.2254, 0.225])
+    
+            # transforms.ToTensor(),
+            # transforms.Normalize(
+            #     [0.485, 0.456, 0.406],
+            #     [0.229, 0.2254, 0.225])
         ])
     
     train_set = MX_WFAS(
-        path_imgrec="/mnt/nvme0n1p2/datasets/untispoofing/CVPR2023-Anti_Spoof-Challenge-Release-Data-20230209/test_4.0.rec",
-        path_imgidx="/mnt/nvme0n1p2/datasets/untispoofing/CVPR2023-Anti_Spoof-Challenge-Release-Data-20230209/test_4.0.idx",
-        transform=get_transform(input_size=224)
+        path_imgrec="/mnt/sdc1/datasets/untispoofing/CVPR2023-Anti_Spoof-Challenge-Release-Data-20230209/test_4.0.rec",
+        path_imgidx="/mnt/sdc1/datasets/untispoofing/CVPR2023-Anti_Spoof-Challenge-Release-Data-20230209/test_4.0.idx",
+        transform=get_transform(input_size=224),
+        scale=4.0
     )
 
+    while True:
+        idx = np.random.randint(0, len(train_set))
+        train_set[idx]
     print(train_set[0])
     print("Done")
